@@ -1,4 +1,8 @@
-﻿///
+﻿// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
+// Upgrade NOTE: replaced '_World2Object' with 'unity_WorldToObject'
+// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
+
+///
 ///  Reference: 	Gooch A, Gooch B, Shirley P, et al. A non-photorealistic lighting model for automatic technical illustration[C]
 ///						Proceedings of the 25th annual conference on Computer graphics and interactive techniques. ACM, 1998: 447-452.
 /// 
@@ -62,9 +66,9 @@ Shader "NPR/Cartoon/Tone Based Shading" {
 			v2f vert (a2v v) {
 				v2f o;
 								
-				o.pos = mul( UNITY_MATRIX_MVP, v.vertex); 
-				o.worldNormal  = mul(v.normal, (float3x3)_World2Object);
-				o.worldPos = mul(_Object2World, v.vertex).xyz;
+				o.pos = UnityObjectToClipPos( v.vertex); 
+				o.worldNormal  = mul(v.normal, (float3x3)unity_WorldToObject);
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 				o.uv = TRANSFORM_TEX (v.texcoord, _MainTex);
 				
 				TRANSFER_SHADOW(o);
@@ -147,9 +151,9 @@ Shader "NPR/Cartoon/Tone Based Shading" {
 			v2f vert (a2v v) {
 				v2f o;
 				
-				o.pos = mul( UNITY_MATRIX_MVP, v.vertex); 
-				o.worldNormal  = mul(v.normal, (float3x3)_World2Object);
-				o.worldPos = mul(_Object2World, v.vertex).xyz;
+				o.pos = UnityObjectToClipPos( v.vertex); 
+				o.worldNormal  = mul(v.normal, (float3x3)unity_WorldToObject);
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 				o.uv = TRANSFORM_TEX (v.texcoord, _MainTex);  
 				
 				TRANSFER_SHADOW(o);

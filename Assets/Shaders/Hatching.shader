@@ -1,3 +1,6 @@
+// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
+// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
+
 ///
 ///  Reference: 	Praun E, Hoppe H, Webb M, et al. Real-time hatching[C]
 ///						Proceedings of the 28th annual conference on Computer graphics and interactive techniques. ACM, 2001: 581.
@@ -14,13 +17,15 @@ Shader "NPR/Pencil Sketch/Hatching" {
 		_Hatch3 ("Hatch 3", 2D) = "white" {}
 		_Hatch4 ("Hatch 4", 2D) = "white" {}
 		_Hatch5 ("Hatch 5", 2D) = "white" {}
+		_U ("U", Vector) = (1.0, 0.0, 0.0)
+		_V("V", Vector) = (0.0, 1.0, 0.0)
 	}
 	
 	SubShader {
 		Tags { "RenderType"="Opaque" }
 		LOD 200
         
-		UsePass "NPR/Cartoon/Antialiased Cel Shading/OUTLINE"
+		//UsePass "NPR/Cartoon/Antialiased Cel Shading/OUTLINE"
         
 		Pass {
 			Tags { "LightMode"="ForwardBase" }
@@ -37,6 +42,7 @@ Shader "NPR/Pencil Sketch/Hatching" {
 			#include "UnityShaderVariables.cginc"
 
 			fixed4 _Color;
+			fixed3 _U, _V;
 			float _TileFactor;
 			sampler2D _Hatch0;
 			sampler2D _Hatch1;
@@ -44,6 +50,7 @@ Shader "NPR/Pencil Sketch/Hatching" {
 			sampler2D _Hatch3;
 			sampler2D _Hatch4;
 			sampler2D _Hatch5;
+			bool _backGround;
 			
 			struct a2v {
 				float4 vertex : POSITION;
@@ -58,54 +65,94 @@ Shader "NPR/Pencil Sketch/Hatching" {
 				fixed3 hatchWeights0 : TEXCOORD1;
 				fixed3 hatchWeights1 : TEXCOORD2;
 				float3 worldPos : TEXCOORD3;
-				SHADOW_COORDS(4)
-			};
+				float3 worldNormal : TEXCOORD4;
+				float3 worldLightDir : TEXCOORD5;
+				SHADOW_COORDS(6)
+			}; 
+			
+			float4x4 inverse(float4x4 input)
+			{
+#define minor(a,b,c) determinant(float3x3(input.a, input.b, input.c))
+				//determinant(float3x3(input._22_23_23, input._32_33_34, input._42_43_44))
+
+				float4x4 cofactors = float4x4(
+					minor(_22_23_24, _32_33_34, _42_43_44),
+					-minor(_21_23_24, _31_33_34, _41_43_44),
+					minor(_21_22_24, _31_32_34, _41_42_44),
+					-minor(_21_22_23, _31_32_33, _41_42_43),
+
+					-minor(_12_13_14, _32_33_34, _42_43_44),
+					minor(_11_13_14, _31_33_34, _41_43_44),
+					-minor(_11_12_14, _31_32_34, _41_42_44),
+					minor(_11_12_13, _31_32_33, _41_42_43),
+
+					minor(_12_13_14, _22_23_24, _42_43_44),
+					-minor(_11_13_14, _21_23_24, _41_43_44),
+					minor(_11_12_14, _21_22_24, _41_42_44),
+					-minor(_11_12_13, _21_22_23, _41_42_43),
+
+					-minor(_12_13_14, _22_23_24, _32_33_34),
+					minor(_11_13_14, _21_23_24, _31_33_34),
+					-minor(_11_12_14, _21_22_24, _31_32_34),
+					minor(_11_12_13, _21_22_23, _31_32_33)
+				);
+#undef minor
+				return transpose(cofactors) / determinant(input);
+			}
 			
 			v2f vert(a2v v) {
 				v2f o;
 				
-				o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
+				o.pos = UnityObjectToClipPos(v.vertex);
 				
 				o.uv = v.texcoord.xy * _TileFactor;
+
+				o.uv = fixed2(dot(v.vertex, _U), dot(v.vertex, _V)) * _TileFactor;
 				
-				fixed3 worldLightDir = normalize(WorldSpaceLightDir(v.vertex));
+				//fixed3 worldLightDir0 = normalize(mul(inverse(UNITY_MATRIX_MV), unity_LightPosition[0])-mul(unity_ObjectToWorld, v.vertex));
+				//fixed3 worldLightDir1 = normalize(mul(inverse(UNITY_MATRIX_MV), unity_LightPosition[1])-mul(unity_ObjectToWorld, v.vertex));
+				fixed3 worldLightDir0 = normalize(WorldSpaceLightDir(v.vertex));
 				fixed3 worldNormal = UnityObjectToWorldNormal(v.normal);
-				fixed diff = max(0, dot(worldLightDir, worldNormal));
-				
+				o.worldLightDir = worldLightDir0;
+				o.worldNormal = worldNormal;
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+
+				//fixed diff = (max(0, dot(worldLightDir0, worldNormal))+ max(0, dot(worldLightDir1, worldNormal)))/2;
+				fixed diff = max(0, dot(worldLightDir0, worldNormal));
+
 				o.hatchWeights0 = fixed3(0, 0, 0);
 				o.hatchWeights1 = fixed3(0, 0, 0);
 				
 				float hatchFactor = diff * 7.0;
 				
-				if (hatchFactor > 6.0) {
+				if (hatchFactor > 6.5) {
 					// Pure white, do nothing
-				} else if (hatchFactor > 5.0) {
-					o.hatchWeights0.x = hatchFactor - 5.0;
-				} else if (hatchFactor > 4.0) {
-					o.hatchWeights0.x = hatchFactor - 4.0;
+				} else if (hatchFactor > 5.5) {
+					o.hatchWeights0.x = hatchFactor - 5.5;
+				} else if (hatchFactor > 4.5) {
+					o.hatchWeights0.x = hatchFactor - 4.5;
 					o.hatchWeights0.y = 1.0 - o.hatchWeights0.x;
-				} else if (hatchFactor > 3.0) {
-					o.hatchWeights0.y = hatchFactor - 3.0;
+				} else if (hatchFactor > 3.5) {
+					o.hatchWeights0.y = hatchFactor - 3.5;
 					o.hatchWeights0.z = 1.0 - o.hatchWeights0.y;
-				} else if (hatchFactor > 2.0) {
-					o.hatchWeights0.z = hatchFactor - 2.0;
+				} else if (hatchFactor > 2.5) {
+					o.hatchWeights0.z = hatchFactor - 2.5;
 					o.hatchWeights1.x = 1.0 - o.hatchWeights0.z;
-				} else if (hatchFactor > 1.0) {
-					o.hatchWeights1.x = hatchFactor - 1.0;
-					o.hatchWeights1.y = 1.0 - o.hatchWeights1.x;
+				} else if (hatchFactor > 1.5) {
+					o.hatchWeights1.x = hatchFactor - 1.5;
+					o.hatchWeights1.y = 1.5 - o.hatchWeights1.x;
 				} else {
 					o.hatchWeights1.y = hatchFactor;
-					o.hatchWeights1.z = 1.0 - o.hatchWeights1.y;
+					o.hatchWeights1.z = 1.5 - o.hatchWeights1.y;
 				}
-				
-				o.worldPos = mul(_Object2World, v.vertex).xyz;
-				
+
 				TRANSFER_SHADOW(o);
 				
 				return o; 
 			}
 			
-			fixed4 frag(v2f i) : SV_Target {			
+			fixed4 frag(v2f i) : SV_Target {		
+
 				fixed4 hatchTex0 = tex2D(_Hatch0, i.uv) * i.hatchWeights0.x;
 				fixed4 hatchTex1 = tex2D(_Hatch1, i.uv) * i.hatchWeights0.y;
 				fixed4 hatchTex2 = tex2D(_Hatch2, i.uv) * i.hatchWeights0.z;
@@ -116,15 +163,17 @@ Shader "NPR/Pencil Sketch/Hatching" {
 							i.hatchWeights1.x - i.hatchWeights1.y - i.hatchWeights1.z);
 				
 				fixed4 hatchColor = hatchTex0 + hatchTex1 + hatchTex2 + hatchTex3 + hatchTex4 + hatchTex5 + whiteColor;
-				
+				//hatchColor.rgb = normalize(i.worldNormal+fixed4(1,1,1,0));
+				//hatchColor.rgb = normalize(i.worldLightDir+fixed4(1,1,1,0));
+				//hatchColor.rgb = fixed3(1.0, 0.0, 0.0)*max(0, dot(i.worldNormal, i.worldLightDir));
 				UNITY_LIGHT_ATTENUATION(atten, i, i.worldPos);
-								
-				return fixed4(hatchColor.rgb * _Color.rgb * atten, 1.0);
+
+				return fixed4(hatchColor.rgb * _Color.rgb, 1.0);
 			}
 			
 			ENDCG
 		}
-		
+		/*
 		Pass {
 			Tags { "LightMode"="ForwardAdd" }
 			
@@ -149,6 +198,7 @@ Shader "NPR/Pencil Sketch/Hatching" {
 			sampler2D _Hatch3;
 			sampler2D _Hatch4;
 			sampler2D _Hatch5;
+			bool _backGround;
 			
 			struct a2v {
 				float4 vertex : POSITION;
@@ -169,7 +219,7 @@ Shader "NPR/Pencil Sketch/Hatching" {
 			v2f vert(a2v v) {
 				v2f o;
 				
-				o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
+				o.pos = UnityObjectToClipPos(v.vertex);
 				
 				o.uv = v.texcoord.xy * _TileFactor;
 				
@@ -203,7 +253,7 @@ Shader "NPR/Pencil Sketch/Hatching" {
 					o.hatchWeights1.z = 1.0 - o.hatchWeights1.y;
 				}
 				
-				o.worldPos = mul(_Object2World, v.vertex).xyz;
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 				
 				TRANSFER_SHADOW(o);
 				
@@ -224,11 +274,11 @@ Shader "NPR/Pencil Sketch/Hatching" {
 				
 				UNITY_LIGHT_ATTENUATION(atten, i, i.worldPos);
 								
-				return fixed4(hatchColor.rgb * _Color.rgb * atten, 1.0);
+				return fixed4(hatchColor.rgb * _Color.rgb * atten, 1.0) * 0.5;
 			}
 			
 			ENDCG
-		} 
+		} */
 	} 
 	
 	FallBack "Diffuse"

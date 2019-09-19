@@ -1,13 +1,19 @@
-﻿///
+﻿// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
+// Upgrade NOTE: replaced '_World2Object' with 'unity_WorldToObject'
+// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
+
+///
 ///  Reference: 	Lake A, Marshall C, Harris M, et al. Stylized rendering techniques for scalable real-time 3D animation[C]
 ///						Proceedings of the 1st international symposium on Non-photorealistic animation and rendering. ACM, 2000: 13-20.
 ///
 Shader "NPR/Pencil Sketch/Pencil Sketch Shading" {
-	Properties {
-		_Color ("Diffuse Color", Color) = (1, 1, 1, 1)
-		_Outline ("Outline", Range(0.001, 1)) = 0.1
-		_OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
-		_TileFactor ("Tile Factor", Range(1, 10)) = 5
+	Properties{
+		_Color("Diffuse Color", Color) = (1, 1, 1, 1)
+		_Outline("Outline", Range(0.001, 1)) = 0.1
+		_OutlineColor("Outline Color", Color) = (0, 0, 0, 1)
+		_TileFactor("Tile Factor", Range(1, 10)) = 5
+		_WhiteTileFactor("White Tile Factor", Range(0.1, 1)) = 1
+		_backGround("Is BackGournd", Range(0, 1)) = 0
 		_Level1 ("Level 1 (Darkest)", 2D) = "white" {}
 		_Level2 ("Level 2 ", 2D) = "white" {}
 		_Level3 ("Level 3 ", 2D) = "white" {}
@@ -42,13 +48,15 @@ Shader "NPR/Pencil Sketch/Pencil Sketch Shading" {
 			
 			fixed4 _Color;
 			float _TileFactor;
+			float _WhiteTileFactor;
 			sampler2D _Level1;
 			sampler2D _Level2;
 			sampler2D _Level3;
 			sampler2D _Level4;
 			sampler2D _Level5;
 			sampler2D _Level6;
-			
+			bool _backGround;
+
 			struct a2v {
 				float4 vertex : POSITION;
 				float3 normal : NORMAL;
@@ -68,10 +76,10 @@ Shader "NPR/Pencil Sketch/Pencil Sketch Shading" {
 			v2f vert (a2v v) {
 				v2f o;
 				
-				o.pos = mul( UNITY_MATRIX_MVP, v.vertex);
-				o.worldNormal  = mul(v.normal, (float3x3)_World2Object);
+				o.pos = UnityObjectToClipPos( v.vertex);
+				o.worldNormal  = mul(v.normal, (float3x3)unity_WorldToObject);
 				o.worldLightDir = WorldSpaceLightDir(v.vertex);
-				o.worldPos = mul(_Object2World, v.vertex).xyz;
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 				o.scrPos = ComputeScreenPos(o.pos);
 				
 				TRANSFER_SHADOW(o);
@@ -88,7 +96,9 @@ Shader "NPR/Pencil Sketch/Pencil Sketch Shading" {
 				
 				fixed diff = (dot(worldNormal, worldLightDir) * 0.5 + 0.5) * atten * 6.0;
 				fixed3 fragColor;
-				if (diff < 1.0) {
+				if (_backGround && atten > 0.99f)
+					fragColor = fixed3(1.0f, 1.0f, 1.0f);
+				else if (diff < 1.0) {
 				 	fragColor = tex2D(_Level1, scrPos).rgb;
 				} else if (diff < 2.0) {
 					fragColor = tex2D(_Level2, scrPos).rgb;
@@ -133,12 +143,14 @@ Shader "NPR/Pencil Sketch/Pencil Sketch Shading" {
 			
 			fixed4 _Color;
 			float _TileFactor;
+			float _WhiteTileFactor;
 			sampler2D _Level1;
 			sampler2D _Level2;
 			sampler2D _Level3;
 			sampler2D _Level4;
 			sampler2D _Level5;
 			sampler2D _Level6;
+			bool _backGround;
 		
 			struct a2v {
 				float4 vertex : POSITION;
@@ -159,10 +171,10 @@ Shader "NPR/Pencil Sketch/Pencil Sketch Shading" {
 			v2f vert (a2v v) {
 				v2f o;
 				
-				o.pos = mul( UNITY_MATRIX_MVP, v.vertex);
-				o.worldNormal  = mul(v.normal, (float3x3)_World2Object);
+				o.pos = UnityObjectToClipPos( v.vertex);
+				o.worldNormal  = mul(v.normal, (float3x3)unity_WorldToObject);
 				o.worldLightDir = WorldSpaceLightDir(v.vertex);
-				o.worldPos = mul(_Object2World, v.vertex).xyz;
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 				o.scrPos = ComputeScreenPos(o.pos);
 				
 				TRANSFER_SHADOW(o);
@@ -176,10 +188,11 @@ Shader "NPR/Pencil Sketch/Pencil Sketch Shading" {
 				fixed2 scrPos = i.scrPos.xy / i.scrPos.w * _TileFactor;
 				
 				UNITY_LIGHT_ATTENUATION(atten, i, i.worldPos);
-				
 				fixed diff = (dot(worldNormal, worldLightDir) * 0.5 + 0.5) * atten * 6.0;
 				fixed3 fragColor;
-				if (diff < 1.0) {
+				if (_backGround && atten > 0.99f)
+					fragColor = fixed3(1.0f, 1.0f, 1.0f);
+				else if (diff < 1.0) {
 				 	fragColor = tex2D(_Level1, scrPos).rgb;
 				} else if (diff < 2.0) {
 					fragColor = tex2D(_Level2, scrPos).rgb;

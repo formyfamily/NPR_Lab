@@ -1,4 +1,8 @@
-﻿Shader "NPR/Low Polygon With Geometry Shader" {
+﻿// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
+// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
+// Upgrade NOTE: replaced 'unity_World2Shadow' with 'unity_WorldToShadow'
+
+Shader "NPR/Low Polygon With Geometry Shader" {
 	Properties {
 		_Color ("Color Tint", Color) = (1, 1, 1, 1)
 	}
@@ -36,9 +40,9 @@
 
 			v2g vert(appdata_base v) {
     			v2g o;
-    			o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
+    			o.pos = UnityObjectToClipPos(v.vertex);
     			o.uv = v.texcoord;
-    			o.worldPos = mul(_Object2World, v.vertex);
+    			o.worldPos = mul(unity_ObjectToWorld, v.vertex);
 
     			return o;
 			}
@@ -120,11 +124,11 @@
 
 			v2g vert(appdata_base v) {
     			v2g o;
-    			o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
+    			o.pos = UnityObjectToClipPos(v.vertex);
     			o.uv = v.texcoord;
-    			o.worldPos = mul(_Object2World, v.vertex);
+    			o.worldPos = mul(unity_ObjectToWorld, v.vertex);
 
-    			o._ShadowCoord = mul(unity_World2Shadow[0], mul(_Object2World, v.vertex));
+    			o._ShadowCoord = mul(unity_WorldToShadow[0], mul(unity_ObjectToWorld, v.vertex));
 
     			return o;
 			}
